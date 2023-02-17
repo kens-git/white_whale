@@ -1,0 +1,331 @@
+<!-- White Whale Part 2: Models -->
+
+<h2>Intro</h2>
+<p>Hello again and welcome to Part 2 of the White whale development blog! This entry 
+will discuss the models that will be used on the back end and form the base representation 
+for data in our system. Every meaningful thing the user sees and interacts with is 
+derived from the instances of these models, so they really are the base of the 
+application that every other feature will refer to.</p>
+<p>It's important to note that I didn't arrive at these models in a single pass: I created 
+models that I thought would work then created instances of them in the admin panel to 
+simulate real data and the interactions between the models, made some changes, and 
+repeated until I arrived at the versions that 
+you see <a href="https://github.com/kens-git/white_whale/commit/05b92a2e2ab7be9de30ee432a52084506f8dc64b">here</a>. 
+This process of prototyping is critical because it's basically guaranteed that we've 
+created multiple issues with our initial assumptions. By taking an implementation through 
+its paces we can root out these issues before we're forced to deal with them at a much 
+more inconvenient time (i.e., production).</p>
+<p>Fortunately, this application will be in development for a while so even if the 
+models aren't perfect we have the opportunity to modify them without affecting actual 
+users or our sanity.</p>
+<p>Before we begin:</p>
+<ul>
+  <li>The models are separated into different applications depending on which feature 
+  they're used for, with the 'core' making up the main application that handles 
+  users and other project-specific site administration features.</li>
+  <li>By default, Django provides a default primary key called 'id', so we won't need to 
+  manually define one in the models.</li>
+  <li>I left out the __str__ methods in this post because they're not particularly 
+important or relevant. They're mostly used for human-readable representations of 
+models in the admin panel.</li>
+</ul>
+
+
+<h2>The Models</h2>
+<h3>Timestamps</h3>
+<pre>
+class Timestamps(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+</pre>
+<p>Timestamps will form the base for almost all if not all of our models. These timestamps 
+will be attached to all of our data so we can see when things are created or edited. This 
+will be useful in the front end for things like 'edited at' labels for comments, or 
+'created at' labels for Groups.</p>
+<p>The auto_now_add and auto_now parameters mean the creation and modification times 
+will be automatically created and updated, respectively.</p>
+<p>The Meta class with the 'abstract' attribute means we can't directly create instances 
+of this model, since it doesn't make much sense to just be storing timestamps in our 
+database with nothing associated with them.</p>
+
+
+<h3>Profile</h3>
+<pre>
+class Profile(Timestamps):
+    location = models.CharField(max_length=200, blank=True)
+    statement = models.CharField(max_length=250, blank=True)
+    status = models.CharField(max_length=1000, blank=True)
+    website = models.CharField(max_length=500, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    profile_image = models.ForeignKey(
+        'ww_albums.UploadedFile',
+        related_name="%(app_label)s_%(class)s_profile_image",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True)
+    header_image = models.ForeignKey(
+        'ww_albums.UploadedFile',
+        related_name="%(app_label)s_%(class)s_header_image",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True)
+
+    class Meta:
+        abstract = True
+</pre>
+<p>The Profile Model is the base model for other models that represent some kind 
+of 'identity', or, an entity that has a profile on the site. 
+For now this just means Users and Groups, but these fields can easily be used by other 
+entities later (e.g., businesses).</p>
+<p>Since this is the base, it's abstract and can't be instantiated on it's own. The 
+fields should mostly be self-explanatory, noting that the max_length parameters were 
+chosen arbitrarily and most of the fields don't enforce any kind of formatting 
+(e.g., users can type whatever they want for their phone number).</p>
+<p>The on_delete for the foreign keys specify what happens 
+when the object being referred to is deleted. In this case, the profile and header 
+images will be set to null if the associated UploadedFile is deleted. If null, 
+we'll just display a default profile and/or header image for these fields.</p>
+<p>A note on the 'blank' and 'null' parameters: when something is allowed to be blank 
+(blank=True), it means that users aren't required to enter a value for it when submitting 
+a form. When something can be null (null=True), it means that the database is able to 
+set 'NULL' as its value.</p>
+<p>By default CharFields aren't nullable, with the reason being that nullable text 
+creates two interpretations for empty values: null, and an empty string. The absence of 
+a string (null) is not the same thing as an empty string, so this forces that 
+distinction.</p>
+
+
+<h3>User</h3>
+<pre>
+class User(AbstractUser, Profile, Timestamps):
+    middle_name = models.CharField(max_length=150, blank=True)
+    birthday = models.DateField(null=True, blank=True)
+    comments = GenericRelation('ww_comments.Comment')
+    notifications = GenericRelation('ww_notifications.Notification')
+</pre>
+<p>The idea of having a User model is straightforward: obviously we need to keep track of 
+who has access to our site and what data is associated with them. Through inheritance 
+the base AbstractUser model provides username, password, first_name, last_name, email, 
+is_staff, is_active, and date_joined fields, with the additional fields being fairly 
+self-explanatory. The Profile model previously mentioned adds the rest of the fields.</p>
+<p>The GenericRelations give 
+us a 'reverse relationship' to all comments and notifications that a User has made, 
+without having to manually query the Comment and Notification models for them.</p>
+
+<h3>AdminNotification</h3>
+<pre>
+class AdminNotification(Timestamps):
+    admin = models.ForeignKey(
+        User,
+        related_name='admin',
+        null=True,
+        on_delete=models.SET_NULL)
+    user = models.ForeignKey(User, related_name='user', on_delete=models.CASCADE)
+    message = models.CharField(max_length=5000)
+</pre>
+<p>Not much to this one: if a user does something bad enough to warrant a sternly 
+written message this model provides the means to do that.</p>
+<p>I don't place much priority in this for now, but in the future we will likely need 
+a field that stores whatever comment, image, etc. that caused the notification 
+to be sent.</p>
+
+
+<h3>FeatureRequest</h3>
+<pre>
+class FeatureRequest(Timestamps):
+    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+    name = models.CharField(max_length=250)
+    description = models.CharField(max_length=1000, blank=True)
+    comments = GenericRelation('ww_comments.Comment')
+    likes = GenericRelation('ww_likes.Like')
+</pre>
+<p>This model tracks feature requests that users can submit, and also allows other 
+users to comment on and like the request.</p>
+
+
+<h3>Comment</h3>
+<pre>
+class Comment(Timestamps):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, null=True, on_delete=models.SET_NULL)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    comment = models.CharField(max_length=5000)
+</pre>
+<p>Getting a little philosophical, what is a wall post? What is a reply? In abstract 
+terms, they're both comments. A wall post is a comment on a profile or person, and a 
+reply is a comment to a wall post or even another comment. In my design - with the 
+exception of direct messages - any time a user enters a response to content on the site, 
+they're creating a comment.</p>
+<p>While there are certain 
+<a href="https://lukeplant.me.uk/blog/posts/avoid-django-genericforeignkey/">pros and cons</a> 
+of using GenericForeignKeys to model this, in this small application I feel the ease of 
+use outweighs the downsides. The benefit is anything that can be commented on can be 
+referenced through this model, and we don't have to have a ton of models like: 
+WallPost, WallPostReply, GroupPost, GroupPostReply, and so on. The cost is that we now 
+have to double-check comments to ensure that what a user is submitting can actually 
+be commented on since the GenericForeignKey won't check that for us.</p>
+<p>Performance <i>may</i> be an issue if the site grows a lot, but my prediction is 
+that most of the data (e.g., comments, likes, etc.) can be partially or wholly kept in 
+memory, meaning that a request will usually hit this in-memory cache and we won't 
+need to consider database performance as much. This is only if the site starts to get 
+slow but I expect it won't.</p>
+<p>The fields of this model include: the user making the comment, the type of, id of, 
+and the actual object that are being commented on, then finally the content of the 
+comment itself.</p>
+<p>I believe the (arbitrary) 5000 character limit on comments is generous, but we 
+may need to revisit this limit in the future.</p>
+<p>The CASCADE for the user field deletion means that if the user making the comment 
+is deleted, then all of the comments they've made are also deleted. If the content 
+being commented on is deleted, the comment remains in the database but the foreign key 
+to that content is set to null.</p>
+
+
+<h3>Like</h3>
+<pre>
+class Like(Timestamps):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+</pre>
+<p>The Like model is basically identical to Comment, except it doesn't contain any data 
+of its own. The existence of a Like in our database just signifies to us that something 
+was liked, which is all we need.</p>
+<p>Unlike Comment, if either the user who created the like or the content being 
+liked is deleted, then the like is also deleted.</p>
+
+
+<h3>Notification</h3>
+<pre>
+class Notification(Timestamps):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+</pre>
+<p>Except for the name, the Notification model <i>is</i> identical to the Like model. 
+It signifies to users that some content was posted that they may be interested in.</p>
+<p>When 
+the front end establishes that the user has acknowledged the notification the back end 
+will delete it. Needing to sync the front and back ends for this creates potential 
+for something to go wrong, so we'll see how it works out later.</p>
+<p>We'll also need to consider what happens if the content is deleted after the user 
+loads the page, since they may still see the notification. The options seem to be to 
+sync the server and client to remove the notification from the front end, or more 
+simply just show an error page that the content was removed or doesn't exist if they 
+click on the link to it.</p>
+
+
+<h3>Album</h3>
+<pre>
+class Album(Timestamps):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=250)
+    description = models.CharField(max_length=1000, blank=True)
+</pre>
+<p>The Album model is straightforward: a user creates a model, gives it a name, and 
+optionally a description.</p>
+<p>The Album on its own is basically a book cover: all 
+it does it store the details of a specific album without the contents.</p>
+
+
+<h3>UploadedFile</h3>
+<pre>
+class UploadedFile(Timestamps):
+    album = models.ForeignKey(Album, on_delete=models.CASCADE)
+    name = models.CharField(max_length=250, blank=True)
+    description = models.CharField(max_length=1000, blank=True)
+    file = models.FileField(upload_to=user_directory_path)
+</pre>
+<p>An UploadedFile represents, well, an uploaded file. It's associated with a 
+specific Album, and optionally can be given a name and/or description.</p>
+<p>The 
+upload_to parameter is a function that will dynamically create the path and file 
+on the server. For now this will be relative to the media folder: 
+media/user{id}/album{id}/{filename}</p>
+<p>Since we're allowing arbitrary files to be uploaded, we'll need to take 
+<a href="https://docs.djangoproject.com/en/4.1/topics/security/#user-uploaded-content-security">extra care</a> 
+in ensuring we're handling them safely.</p>
+<p>We'll handle multiple file uploads by using a 'multiple' attribute 
+in the upload form in the front end, then looping over the files and creating 
+UploadedFiles for each file in the back end.</p>
+
+
+<h3>Message</h3>
+<pre>
+class Message(Timestamps):
+    from_user = models.ForeignKey(
+        User,
+        related_name="from_user",
+        on_delete=models.PROTECT)
+    to_user = models.ForeignKey(
+        User,
+        related_name="to_user",
+        on_delete=models.PROTECT)
+    content = models.CharField(max_length=5000)
+</pre>
+<p>The Message model simply provides the means for one user to message another. Since 
+messages aren't public and are sent to one specific user I don't consider them to 
+be a generic 'comment' type and so have their own model.</p>
+<p>The related_name parameter is to differentiate between the to_user and from_user, since 
+they will both point to the same table in the database as foreign keys.</p>
+<p>There is a potential housekeeping issue with this model: if both users are deleted 
+then we'll have to ensure that we also delete messages that they've sent each other. 
+As it stands if one side of a conversation is deleted then the other side can 
+still view the message history, so when both sides are deleted there's no one 
+left to look at them and they'll be removed.</p>
+
+
+<h3>Group</h3>
+<pre>
+class Group(Profile, Timestamps):
+    owner = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+    name = models.CharField(max_length=500)
+    email = models.EmailField(blank=True)
+    comments = GenericRelation(Comment)
+</pre>
+<p>A Group is not too different from a User model, with the exception that it's 
+associated with an owner instead of a user account.</p>
+<p>I've opted to preserve the group if it's deleted and will likely turn it over 
+to an admin to decide what to do with it. Users, of course, can deleted their own 
+groups but if a user is deleted from the site without removing their groups then 
+this gives us a chance to make a judgement on what should happen to that group.</p>
+
+
+<h3>GroupMember</h3>
+<pre>
+class GroupMember(Timestamps):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+</pre>
+<p>This model simply tracks group membership. If either the group or user are deleted, 
+then this membership is also deleted.</p>
+<p>We'll also need to double-check that a user isn't trying to join a group multiple 
+times.</p>
+
+
+<h2>Other Considerations</h2>
+<p>For now I didn't add any way to track history in any of 
+the models. This might be helpful for something like a history of edits on a comment 
+but it complicates the initial implementation so I left it out.</p>
+<p>Certain logic won't be enforced by the models but will instead be enforced when 
+an instance of the model is saved or modified in the database. This includes things 
+like:</p>
+<ul>
+  <li>Users can't send themselves direct messages.</li>
+  <li>Users can't use another user's image for their profile/header picture.</li>
+  <li>Users can't like or comment on things that don't accept one of those actions.</li>
+</ul>
+<p>The front end will imply that stuff like this isn't possible (e.g., there won't be a 
+'set profile image' button for unowned images), but it will then be strictly enforced 
+in the back end since it may be possible to manually create a request to the API to 
+do this.</p>
+
+<h2>Next</h2>
+<p>Part 3 will discuss the REST API that we will use to link the front and back ends.</p>
+<p>This arguably will be just as important as the models since every interaction we 
+have with the back end from our front end will be mediated by this API.</p>
