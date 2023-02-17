@@ -1,0 +1,132 @@
+<!-- White Whale Part 1: Introduction -->
+
+<h2>Intro</h2>
+<p>Welcome to the first installment in the 'White Whale' social network development blog!
+ This blog documents the progress I make on the project and will include my commentary 
+as I explain the decisions I make: with the goal being to provide new developers 
+with exposure to a full stack web application in development. Hopefully, 
+this will help bridge the gap for new developers between developing small demo projects 
+and developing a reasonably production-ready project from a given specification.</p>
+<p>This blog will also demonstrate how to handle new features and changes to existing 
+features. I'm sure I'll get new ideas that I want to add or may even miss a detail in 
+the implementation of a feature and have to modify it later.</p>
+<p>The project will use Django with Python for the back end and React with TypeScript 
+for the front end, though my intention is to explain my reasoning so that it will be 
+applicable to any frameworks.</p>
+<p>The focus for the forseeable future will be on the back end. The back end is the 
+gatekeeper of the application, so it's important to get it right first before thinking 
+about the front end.</p>
+<p>This blog is solely focused on development, and I won't be discussing:</p>
+<ul>
+  <li>Specific development setups (IDE, plugins)</li>
+  <li>Coding style</li>
+  <li>Specific toolchains and other code quality tools</li>
+  <li>Deployment (since there's too many possibilities)</li>
+</ul>
+
+<p>The code will be put into the following repo: 
+<a href="https://github.com/kens-git/white_whale">https://github.com/kens-git/white_whale</a>. 
+Note that the Docker files, scripts, and other configuration files are in a state of flux 
+and are subject to change at any time, so don't rely on them. The 
+app/config and app/core folders are where the code from this blog will be.</p>
+
+<h2>The Project</h2>
+<p>As stated, the project is a social network with the features expected 
+in a modern social network:</p>
+<ul>
+  <li>User Profiles</li>
+  <li>Media Albums</li>
+  <li>Posts</li>
+  <li>Comments</li>
+  <li>User Feed/Recent Activity (both user-specific and site-wide)</li>
+  <li>Friends</li>
+  <li>Messages</li>
+  <li>Chat</li>
+  <li>Groups</li>
+  <li>Buy/Sell</li>
+  <li>Blogs</li>
+  <li>Job Board</li>
+  <li>Search</li>
+  <li>All Users Page</li>
+  <li>Admin Panel</li>
+  <li>Feature Request Page</li>
+</ul>
+<p>This feature set is pretty ambitious, so the initial MVP will only include:</p>
+<ul>
+  <li>
+    User Profiles:
+    <ul>
+      <li>Name (first, middle, last)</li>
+      <li>Location (city, state/province, country)</li>
+      <li>Personal about message</li>
+      <li>Status</li>
+      <li>Birthday</li>
+      <li>Email</li>
+      <li>Website</li>
+      <li>Phone Number</li>
+    </ul>
+  </li>
+  <li>
+    Media Albums:
+    <ul>
+      <li>Users can upload files into albums.</li>
+      <li>Albums have an associated name and description.</li>
+      <li>Users can comment on uploaded files.</li>
+      <li>Albums will show when they last had files added.</li>
+    </ul>
+  </li>
+  <li>Posts</li>
+  <li>Comments</li>
+  <li>
+    User Feed
+    <p>The user feed displays site activity that's relevant to the user, such as comments 
+on their content or replies to their posts.</p>
+  </li>
+  <li>
+    Recent Activity
+    <p>Recent activity is the same as the user feed, but contains activity from all users.</p>
+  </li>
+  <li>Messages</li>
+  <li>
+    Groups
+    <p>Groups can be created for events, special interests, etc.</p>
+  </li>
+  <li>
+    All Users Page
+    <p>A basic list of all users on the site.</p>
+  </li>
+  <li>
+    Admin Panel
+    <ul>
+      <li>Admins can add new users.</li>
+      <li>Admins can edit and delete content, and the offending user 
+should be notified.</li>
+    </ul>
+  </li>
+  <li>
+    Feature Request Page
+    <p>Gives an input form where users can request features they want added.</p>
+  </li>
+</ul>
+
+<h2>Assumptions</h2>
+<p>The project will be developed with a few assumptions in mind:</p>
+<ul>
+  <li>The expected number of registered users will range from a few dozen, up to a few 
+thousand.</li>
+  <li>The maximum number of active users will be between 20 to 100.</li>
+  <li>Per the previous two points, optimizations aren't a priority.</li>
+  <li>One or more users act as administrators and will control registrations. 
+This means new users will only be created by an admin.</li>
+  <li>Trust between users is assumed to be high, which allows the implementation to 
+be simpler. For instance, there's no need to hide the content of one user from another 
+via privacy settings: it's assumed every user knows the other users and willingly shares 
+their content with them.</li>
+  <li>While user content is available to all other users, nothing is visible 
+to anyone without an account ('walled garden').</li>
+</ul>
+<p>While a site like this won't earn us trillion dollar valuations anytime soon, 
+the simplicities these assumptions bring mean we can focus on adding features first and 
+optimizing later: if we even have to at all.</p>
+<h2>Next</h2>
+<p>Part 2 will introduce the models that will lay the foundation for the application.</p>
